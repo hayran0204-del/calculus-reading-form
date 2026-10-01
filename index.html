@@ -436,13 +436,46 @@ form.addEventListener('submit',(e)=>{
   submitBtn.disabled=true;
   submitBtn.textContent='제출 중...';
 
-  fetch(SUBMIT_URL, {
-    method: 'POST',
-    mode: 'no-cors',
-    headers: { 'Content-Type': 'text/plain;charset=utf-8' },
-    body: JSON.stringify(data)
-  })
-  .then(() => {
+  submitViaHiddenForm(data);
+  });
+});
+
+
+function submitViaHiddenForm(data){
+  const iframeName='gas-submit-frame';
+  let iframe=document.getElementById(iframeName);
+
+  if(!iframe){
+    iframe=document.createElement('iframe');
+    iframe.id=iframeName;
+    iframe.name=iframeName;
+    iframe.style.display='none';
+    document.body.appendChild(iframe);
+  }
+
+  const postForm=document.createElement('form');
+  postForm.method='POST';
+  postForm.action=SUBMIT_URL;
+  postForm.target=iframeName;
+  postForm.style.display='none';
+
+  const payload=document.createElement('input');
+  payload.type='hidden';
+  payload.name='payload';
+  payload.value=JSON.stringify(data);
+  postForm.appendChild(payload);
+
+  document.body.appendChild(postForm);
+
+  let finished=false;
+
+  const finishSuccess=()=>{
+    if(finished) return;
+    finished=true;
+    iframe.removeEventListener('load',finishSuccess);
+
+    if(postForm.parentNode) postForm.parentNode.removeChild(postForm);
+
     statusEl.className='status';
     statusEl.textContent='';
     submitBtn.disabled=false;
@@ -450,16 +483,25 @@ form.addEventListener('submit',(e)=>{
     form.reset();
     membersEl.innerHTML='';
     addMember(); addMember(); addMember();
+
     document.getElementById('successModal').classList.add('open');
     document.body.style.overflow='hidden';
-  })
-  .catch(() => {
+  };
+
+  iframe.addEventListener('load',finishSuccess);
+  postForm.submit();
+
+  setTimeout(()=>{
+    if(finished) return;
+    finished=true;
+    iframe.removeEventListener('load',finishSuccess);
+    if(postForm.parentNode) postForm.parentNode.removeChild(postForm);
     statusEl.className='status err';
-    statusEl.textContent='제출 중 오류가 발생했습니다. 잠시 후 다시 시도해 주세요.';
+    statusEl.textContent='제출 확인에 시간이 오래 걸리고 있습니다. 잠시 후 다시 시도해 주세요.';
     submitBtn.disabled=false;
     submitBtn.textContent='제출하기';
-  });
-});
+  },15000);
+}
 
 function closeSuccessModal(){
   document.getElementById('successModal').classList.remove('open');
